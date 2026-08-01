@@ -1,0 +1,21 @@
+id = "layout"
+name = "Layout"
+version = "0.2.0"
+min_herdr_version = "0.7.0"
+description = "Spin up SSH workspaces and shells from config.yaml on startup"
+platforms = ["linux", "macos"]
+
+[[startup]]
+command = ["bash", "setup.sh"]
+
+[[actions]]
+id = "apply"
+title = "Apply layout"
+contexts = ["workspace"]
+command = ["bash", "setup.sh"]
+
+[[actions]]
+id = "save"
+title = "Save layout"
+contexts = ["workspace"]
+command = ["bash", "save.sh"]
