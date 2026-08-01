@@ -135,8 +135,8 @@ compact_home() {
   printf "# on %s\n\n" "$(uname -rom)"
   printf "session:\n"
   printf "  name: %s\n" "$SESSION"
-  printf "# if mode is `strict`, session will be restored exactly like in configuration file:\n"
-  printf "# excess workspace/tabs/planes will be closed\n"
+  printf "# if mode is 'strict', session will be restored exactly like in\n"
+  printf "# configuration file: excess workspace/tabs/planes will be closed\n"
   printf "mode: non-strict\n"
   printf "\nworkspaces:\n"
 
@@ -173,6 +173,11 @@ compact_home() {
       PANE_IDS_IN_TAB=$(echo "$PANE_JSON" |
         "$YQ" -r "[.result.panes[] | select(.tab_id == \"$TAB_ID\") | .pane_id][]")
 
+      # Get split history for this tab (from first pane's layout)
+      FIRST_PANE=$(echo "$PANE_IDS_IN_TAB" | head -1)
+      LAYOUT_JSON=$("$HERDR" --session "$SESSION" pane layout --pane "$FIRST_PANE" 2>/dev/null)
+      SPLIT_COUNT=$(echo "$LAYOUT_JSON" | "$YQ" -r '.result.layout.splits | length // 0' 2>/dev/null)
+
       printf "        panes:\n"
 
       pane_idx=0
@@ -190,7 +195,14 @@ compact_home() {
 
         # Only write split for non-first panes
         if [[ "$pane_idx" -gt 0 ]]; then
-          printf "            split: down\n"   # default, could be "right"
+          _split_idx=$((pane_idx - 1))
+          _split_dir=$(echo "$LAYOUT_JSON" | "$YQ" -r ".result.layout.splits[$_split_idx].direction // \"down\"" 2>/dev/null)
+          _split_ratio=$(echo "$LAYOUT_JSON" | "$YQ" -r ".result.layout.splits[$_split_idx].ratio // 0" 2>/dev/null)
+          printf "            split: %s\n" "${_split_dir:-down}"
+          # Only write ratio if not default 0.5
+          if [[ -n "$_split_ratio" && "$_split_ratio" != "0" && "$_split_ratio" != "0.5" && "$_split_ratio" != "null" ]]; then
+            printf "            ratio: %s\n" "$_split_ratio"
+          fi
         fi
 
         pane_idx=$((pane_idx + 1))
