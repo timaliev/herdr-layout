@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # set -euo pipefail
-
+# set -x
 # ── Herdr Layout Save Script ──────────────────────────────────
 # Captures current herdr session layout to config-$SESSION.yaml
 # Overwrites on each run making backup file. Omits default values.
@@ -8,12 +8,14 @@
 
 HERDR="${HERDR_BIN_PATH:-herdr}"
 
-# ── yq bootstrap (same as setup.sh) ──────────────────────────
+echo "[layout] HERDR_PLUGIN_ROOT=${HERDR_PLUGIN_ROOT}" >&2
+# ── yq bootstrap ──────────────────────────
+YQ_BIN=$(dirname ${HERDR_PLUGIN_ROOT:-$HOME/.config/herdr/plugins/layout})/bin
 if ! command -v yq &>/dev/null; then
-  YQ_BIN="${HERDR_PLUGIN_ROOT:-$HOME/.config/herdr/plugins}/bin"
   [[ -d "$YQ_BIN" ]] && export PATH="$YQ_BIN:$PATH"
 fi
 
+# ── ensure yq is available ────────────────────────────────────
 if ! command -v yq &>/dev/null; then
   YQ_VERSION="v4.53.2"
   echo "[layout-save] yq not found — downloading yq ${YQ_VERSION}..." >&2
@@ -23,7 +25,6 @@ if ! command -v yq &>/dev/null; then
     *)      echo "[layout-save] unsupported platform" >&2; exit 1;;
   esac
   [[ "$(uname -m)" == "arm64" || "$(uname -m)" == "aarch64" ]] && YQ_PLATFORM="${YQ_PLATFORM%amd64}arm64"
-  YQ_BIN="${HERDR_PLUGIN_ROOT:-$HOME/.config/herdr/plugins}/bin"
   mkdir -p "$YQ_BIN"
   curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_${YQ_PLATFORM}" -o "$YQ_BIN/yq" || {
     echo "[layout-save] failed to download yq" >&2; exit 1; }
@@ -58,7 +59,7 @@ if [[ -f "$OUTPUT" ]]; then
   BACKUP_FILE=${OUTPUT}-$(date -Iseconds).backup~
   cp -p "$OUTPUT" "$BACKUP_FILE"
   echo "[layout-save] previous config file saved as: $BACKUP_FILE"
-elif [[ -d "$CONFIG_DIR" ]]; then
+elif [[ ! -d "$CONFIG_DIR" ]]; then
   echo "[layout-save] there is no configuration directory for plugin, cannot continue: $CONFIG_DIR" >&2
   exit 0
 fi
@@ -135,8 +136,11 @@ compact_home() {
   printf "# on %s\n\n" "$(uname -rom)"
   printf "session:\n"
   printf "  name: %s\n" "$SESSION"
-  printf "# if mode is 'strict', session will be restored exactly like in\n"
-  printf "# configuration file: excess workspace/tabs/planes will be closed\n"
+  printf "# if mode is 'strict', session will be completely restored:\n"
+  printf "# any existing workspace/tabs/planes will be closed\n"
+  printf "# and recreated from this configuration file.\n"
+  printf "# All previous agent sessions won't be restored.\n"
+  printf "# All commands will be re-launched.\n"
   printf "mode: non-strict\n"
   printf "\nworkspaces:\n"
 
