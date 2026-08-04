@@ -55,7 +55,7 @@ Create the config directory:
 mkdir -p "$(herdr plugin config-dir layout)"
 ```
 
-Place a `config-<session>.yaml` file there (see [Configuration](#configuration)).
+Place a `config-<session>.yaml` file directly in that directory (see [Configuration](#configuration)).
 
 ## Usage
 
@@ -75,7 +75,8 @@ Captures the running session to YAML:
 herdr plugin action invoke layout.save
 ```
 
-Output: `$HERDR_PLUGIN_CONFIG_DIR/config-<session>.yaml`
+Output: `$HERDR_PLUGIN_CONFIG_DIR/config-<session>.yaml`  
+A timestamped backup of the previous file is created at `config-<session>.yaml-<ISO-date>.backup~` before overwriting.
 
 ### Keybindings
 
@@ -116,7 +117,7 @@ herdr plugin action invoke layout.save
 
 ## Configuration reference
 
-Config files live in `$HERDR_PLUGIN_CONFIG_DIR/layout/` (run `herdr plugin config-dir layout` to find it). Files are named `config-<session>.yaml`.
+Config files live in `$HERDR_PLUGIN_CONFIG_DIR` (run `herdr plugin config-dir layout` to find it). Files are named `config-<session>.yaml`.
 
 ### Top-level
 
@@ -200,21 +201,23 @@ workspaces:
 
 1. Detect current herdr session from `$HERDR_SOCKET_PATH`.
 2. Find matching `config-<session>.yaml` in the plugin config directory.
-3. Wait for session restore to populate workspaces (up to 10s).
-4. For each workspace in config:
-   - First workspace: rename herdr's default workspace if in `strict` mode.
-   - Subsequent workspaces: create if not existing, skip if already present.
-5. For each tab: rename first tab (`strict`), create or reuse subsequent tabs.
-6. For each pane: split if needed, set cwd, run command (skipped if agent already restored).
-7. Clean up stray workspaces/tabs/panes in `strict` mode.
-8. Apply focus.
+3. Set terminal title from `session.label` (or `session.name` if no label).
+4. Wait for session restore to populate workspaces (up to 10s) and agents (up to 15s).
+5. Build a map of restored agents by pane ID (to skip re-launching them).
+6. For each workspace in config:
+   - **Non-strict**: find existing workspace by label match → reuse it; if not found → create new.
+   - **Strict**: create new workspace, then close all previously-existing workspaces.
+7. For each tab: find existing tab by label match → reuse it (non-strict), or create new (strict/not found). In strict mode, close the old first tab after creating the new one.
+8. For each pane: first pane is the tab's root pane; subsequent panes split from it (direction and ratio from config). Set cwd, run command (skipped if agent will be restored by session resume).
+9. Apply focus in order: pane → tab → workspace.
 
 ### Save flow
 
-1. Read all workspaces from the session, skip mirror-plugin workspaces (detected by pane `foreground_cwd`).
-2. For each tab, get `pane layout` to detect split direction and ratio.
-3. Detect agent type for each pane.
+1. Read all workspaces from the session, skip mirror-plugin workspaces (detected by pane `foreground_cwd` containing `.mirror-pane`).
+2. For each tab, get `pane layout` from the first pane to detect split direction and ratio for subsequent panes.
+3. Detect agent type for each pane via `herdr pane get`.
 4. Write YAML, omitting defaults (cwd same as parent, split `down`, ratio `0.5`).
+5. Create a timestamped backup of the previous config file before overwriting.
 
 ## Related projects
 
