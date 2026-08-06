@@ -357,7 +357,7 @@ for ((ws_idx = 0; ws_idx < $WORKSPACE_COUNT; ws_idx++)); do
         _tab_id=${CURRENT_TAB_ARR["0"]}
         _tab_name=${CURRENT_TAB_MAP["$_tab_id"]}
         "$HERDR" --session "$SESSION" tab close "$_tab_id" >/dev/null || true
-        echo "[layout]  → previous existing tab '$_tab_name' ($_tab_id): closed because of strict mode"
+        echo "[layout]    → previous existing tab '$_tab_name' ($_tab_id): closed because of strict mode"
       fi
     fi
 
@@ -399,6 +399,7 @@ for ((ws_idx = 0; ws_idx < $WORKSPACE_COUNT; ws_idx++)); do
       if [[ "$pane_idx" -eq 0 ]]; then
         # First pane is the root pane
         PANE_ID="$ROOT_PANE"
+        PANE_FOCUS="null"
         echo "[layout]      → pane $pane_idx ($PANE_ID): root pane"
       else
         # Split from current pane if current pane's index is
@@ -458,12 +459,16 @@ for ((ws_idx = 0; ws_idx < $WORKSPACE_COUNT; ws_idx++)); do
         "$HERDR" --session "$SESSION" wait output "$PANE_ID" --match "$PANE_WAIT_MATCH" --timeout "$TIMEOUT" >/dev/null || true
       fi
 
-      if [[ "$PANE_FOCUS" == "true" ]]; then
+      if [[ "$PANE_FOCUS" == "true" && "$ROOT_PANE" != "$PANE_ID" ]]; then
         # pane is focused from previous pane with direction
         FOCUS_PANE="$CURRENT_PANE"
         FOCUS_PANE_DIRECTION=${PANE_SPLIT:-down}
+      else
+        # even if focus=true pane was not split so focus ignored
+        echo "[layout]      → focus for pane $PANE_ID is ignored -- it is the root (default) pane"
       fi
       CURRENT_PANE="$PANE_ID"
+      PANE_FOCUS=""
     done
 
     if [[ -n "$FOCUS_PANE" ]]; then
@@ -471,13 +476,26 @@ for ((ws_idx = 0; ws_idx < $WORKSPACE_COUNT; ws_idx++)); do
       focus=($(echo $PANE_JSON |\
         "$YQ" -r '.result.focus | .focused_pane_id + " " + .changed'))
       res=$([[ ${focus[1]} == "true" ]] && echo "success" || echo "failed" )
-      echo "[layout]      → Focused pane: ${focus[0]} - ${res}"
+      if [[ "$res" == "success" ]]; then
+        echo "[layout]      → Focused pane: ${focus[0]} - ${res}"
+      else
+        echo "[layout]      → Focus pane ${res}: ${focus[1]} from $FOCUS_PANE $FOCUS_PANE_DIRECTION"
+        echo "[layout]      → Focus pane ${res} diag: ${PANE_JSON}"
+      fi
     fi
   done
 
   if [[ -n "$FOCUS_TAB" ]]; then
-    echo "[layout]    → Focusing tab: $FOCUS_TAB"
-    "$HERDR" --session "$SESSION" tab focus "$FOCUS_TAB" >/dev/null || true
+    TAB_JSON=$("$HERDR" --session "$SESSION" tab focus "$FOCUS_TAB" 2>/dev/null)
+    focus=$(echo $TAB_JSON |\
+      "$YQ" -r '.result.tab.focused')
+      res=$([[ ${focus} == "true" ]] && echo "success" || echo "failed" )
+    if [[ "$res" == "success" ]]; then
+      echo "[layout]      → Focused tab: $FOCUS_TAB - ${res}"
+    else
+      echo "[layout]      → Focus tab ${res}: $FOCUS_TAB"
+      echo "[layout]      → Focus tab ${res} diag: ${TAB_JSON}"
+    fi
   fi
 done
 
