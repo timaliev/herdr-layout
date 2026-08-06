@@ -44,7 +44,10 @@ On herdr startup, the plugin detects which session it's in (by matching `session
 
 ## Installation
 
+Assuming `herdr` was already run and created `~/.config/herdr/` directory:
+
 ```bash
+git clone https://github.com/timaliev/herdr-layout.git ~/.config/herdr/plugins/layout
 herdr plugin link ~/.config/herdr/plugins/layout
 herdr server reload-config
 ```
@@ -61,11 +64,13 @@ Place a `config-<session>.yaml` file directly in that directory (see [Configurat
 
 ### Apply layout (startup or manual)
 
-Layout is applied automatically on herdr startup via the `[[startup]]` hook. To apply manually:
+Layout is applied automatically on herdr startup via the `[[startup]]` hook . To apply manually:
 
 ```bash
 herdr plugin action invoke layout.apply
 ```
+
+Apply will run if `$HERDR_PLUGIN_CONFIG_DIR/config-<session>.yaml` is present. Without configuration file plugin will silently fail. To find current configuration directory for plugin run `herdr plugin config-dir layout`. To see plugin logs, run `herdr plugin log`.
 
 ### Save current layout
 
